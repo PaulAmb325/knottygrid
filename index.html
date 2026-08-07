@@ -1,0 +1,245 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"
+    />
+    <title>knottygrid</title>
+    <style>
+      /* The interface's colours, named by the job each one does rather than by what
+         colour it happens to be. Every component reads these and nothing else, so
+         choosing the palette means setting nine values here — not editing sixteen
+         files, and not deciding the same thing twice in two places.
+
+         **These are the default theme, `sherbet`, written out.** The chosen theme is
+         applied over them by `useInterfaceTheme` as soon as the app mounts — but
+         that is a moment later, and a page whose first paint is the wrong colour
+         flashes. So the default lives here too, and `src/theme/themes.js` is where
+         all three are defined.
+
+         The chart has roles of its own — `chart-ground`, `chart-ink`, `chart-rule` —
+         so that a dark theme can invert it on screen. What is printed does not
+         change: an export reads none of these and is black on white whatever the
+         interface is wearing. See `docs/palette.md`. */
+      :root {
+        --ground: #eef1fa; /* pale periwinkle — the page and the toolbar on it */
+        --surface: #ffffff; /* white — a control on the ground: a button, a field */
+        --surface-raised: #fbf6fd; /* barely grape — a window above the page */
+        --floating-surface: #fbf6fd; /* the panels that float over the chart itself:
+                                        the brush palette and the zoom box. Their own
+                                        roles because they sit on the chart rather
+                                        than over the page, and a theme may want them
+                                        to read differently from a window */
+        --floating-line: #8a80b6; /* dividers and brush outlines inside those */
+        --line: #8a80b6; /* grape — borders and dividers in the interface */
+        --chart-rule: #8a80b6; /* grape — the chart's own grid, which wants to be
+                                  lighter than an interface border: it must be
+                                  countable without competing with the symbols */
+        --chart-ground: #ffffff; /* the chart's own sheet, and the stitches on it.
+                                    Roles rather than literals only so the chart can
+                                    invert in a dark theme — an export never reads
+                                    these, and stays black on white whatever the
+                                    interface is wearing. See `docs/palette.md`. */
+        --chart-ink: #000000;
+        --chart-veil: #453b6e; /* deep grape — laid over everything except the row
+                                  being knitted, so that row stands out by being the
+                                  one thing not covered. Each theme's own dark hue,
+                                  never a neutral grey: it is the only thing drawn on
+                                  the chart that is the interface's rather than the
+                                  chart's, so it wears the interface's colours. */
+        --ink: #2a1a45; /* dark grape — all interface text */
+        --glyph: #3f2a66; /* grape — stitch symbols in the palette and the library,
+                             never the ones on the chart, which stay black */
+        --muted: #574a7a; /* mid grape — text that recedes: "saved", counts, hints */
+        --accent: #a8125f; /* hot pink — the primary action, and the loaded brush */
+        --accent-tint: #e8f3c4; /* lime — the fill behind what the accent has marked */
+        --on-accent: #ffffff; /* white — text on top of the accent */
+        --warning: #fbe0a6; /* pale amber — the ground of a failure message */
+        --danger: #8c1034; /* deep rose — deleting a chart, and nothing else */
+        --disabled: #867eae; /* pale grape — a control there is nothing to do with */
+      }
+
+      html,
+      body,
+      #root {
+        height: 100%;
+        margin: 0;
+      }
+
+      body {
+        background: var(--ground);
+        color: var(--ink);
+        overflow: hidden;
+        /* Monospace, the way jingknits' chart tool reads. iPadOS resolves
+           ui-monospace to SF Mono, so this costs no download. */
+        font-family: ui-monospace, 'JetBrains Mono', 'SF Mono', Menlo, monospace;
+        -webkit-text-size-adjust: 100%;
+        -webkit-tap-highlight-color: transparent;
+        -webkit-user-select: none;
+        user-select: none;
+      }
+
+      /* Grand Atlas, the one face in the app that is not the monospace everything
+         else reads in. One weight, because it is the only one there is.
+
+         Relative, not rooted: a project page serves the app from `/knottygrid/`, and
+         `/fonts/...` would look for it at the domain root and find nothing.
+
+         Licence: the file names no copyright holder, no designer and no terms at
+         all — its only provenance is "Fontself iOS", the app fonts are drawn in. Mel
+         checked the source and confirmed it is free for any use including
+         commercial, which is what the build relies on: deploying publishes it as a
+         webfont, and that is a permission of its own. If it is ever in doubt,
+         deleting this block is the whole fix — the wordmark falls back to the faces
+         already on the device and nothing else moves.
+
+         **To swap the face**: drop the file in `public/fonts/`, change the two lines
+         below and the first name in `.wordmark`, and update the credit in
+         `NOTICE.txt` and `README.md`. `format()` follows the file — `woff2` for a
+         `.woff2`, which is roughly 40% smaller than an `.otf` and worth preferring.
+         A face with a real Bold also retires the synthesis noted under `.wordmark`. */
+      @font-face {
+        font-family: 'Grand Atlas';
+        src: url('fonts/GrandAtlas-Regular.ttf') format('truetype');
+        font-weight: 400;
+        font-display: swap;
+      }
+
+      /* The wordmark. Falls back to the widest-drawn faces already on the device, so
+         it still reads as a title if the font has not arrived — or has been pulled. */
+      .wordmark {
+        font-family: 'Grand Atlas', 'Avenir Next Condensed', 'Futura', 'Gill Sans',
+          system-ui, sans-serif;
+        /* Synthesised, not real: Grand Atlas ships one weight, so the browser
+           thickens Regular to reach this. A face with a true Bold would drop in
+           without this line changing. */
+        font-weight: 700;
+        letter-spacing: 0.01em;
+        /* The one exemption from the lowercase rule below, and for the same reason
+           chart names are exempt: this is a name, not a label. Asked for as
+           "KnottyGrid", so that is how it is spelled. */
+        text-transform: none;
+      }
+
+      /* Form controls do not inherit font-family from their ancestors, so the
+         app's font never reaches a button or an input without this. */
+      button,
+      input,
+      select,
+      textarea {
+        font-family: inherit;
+      }
+
+      /* Nor do they inherit colour, and an unstyled box is white with black text
+         whatever the theme — which on a dark one is a lit rectangle in the middle of
+         the toolbar. Only the boxes that hold typing: the colour well and the
+         opacity slider are painted by what they control, not by the theme. */
+      input[type='text'],
+      input[type='number'] {
+        background: var(--surface);
+        color: var(--ink);
+      }
+
+      /* iOS Safari paints button text in the system blue unless a colour is set, and
+         every glyph is drawn with `currentColor` — so without this the eraser and
+         every stitch in the palette come out blue on the one device this app is for.
+         Set on the element rather than per button, since nothing here should ever
+         take a colour the operating system chose. */
+      button {
+        color: var(--ink);
+        /* Every label on a control reads as one. The exceptions set their own weight:
+           the wordmark is not a button, and "too big to fit" is a reason rather than
+           a thing to press. */
+        font-weight: 600;
+      }
+
+      /* The interface is lowercase throughout. Enforced here rather than trusted
+         to every string, so a stray capital cannot reach the screen. Inputs are
+         left out: what the user types is theirs, including chart names. */
+      button,
+      label,
+      h1,
+      h2 {
+        text-transform: lowercase;
+      }
+
+      /* The panels that float over the chart: the brush palette and the zoom box.
+         A class rather than an inline style, so the translucent version can sit
+         behind a plain one — a browser without `color-mix` takes the solid colour and
+         the panel is still the right colour, just not frosted. */
+      .floating-panel {
+        background: var(--floating-surface);
+        background: color-mix(in srgb, var(--floating-surface) 94%, transparent);
+        backdrop-filter: blur(12px);
+        border: 1px solid rgba(0, 0, 0, 0.08);
+        box-shadow: 0 6px 24px rgba(0, 0, 0, 0.14);
+      }
+
+      .symbol-glyph svg {
+        display: block;
+        width: 100%;
+        height: 100%;
+      }
+
+      /* The opacity slider shows what it controls: its track runs from the chosen
+         colour at nothing to the same colour at full, over the white the chart is
+         drawn on. So the track *is* the preview, and the swatch beside it can stay
+         the solid colour it will paint. Needs real CSS because a range input's track
+         and thumb are pseudo-elements no inline style can reach. */
+      .opacity-slider {
+        -webkit-appearance: none;
+        appearance: none;
+        height: 24px;
+        background: transparent;
+      }
+
+      .opacity-slider::-webkit-slider-runnable-track {
+        height: 22px;
+        border: 1px solid #c8c8c8;
+        border-radius: 11px;
+        /* The colour gradient over the checkerboard every editor uses to mean "there
+           is nothing here": at the transparent end the squares show through, which is
+           what a cell painted at that opacity actually looks like. */
+        background:
+          var(--opacity-track),
+          repeating-conic-gradient(#d8d8d8 0% 25%, #ffffff 0% 50%) 0 0 / 10px 10px;
+      }
+
+      .opacity-slider::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        width: 20px;
+        height: 20px;
+        border: 1px solid #6a6a6a;
+        border-radius: 50%;
+        background: #fff;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+      }
+
+      .opacity-slider::-moz-range-track {
+        height: 22px;
+        border: 1px solid #c8c8c8;
+        border-radius: 11px;
+        /* The colour gradient over the checkerboard every editor uses to mean "there
+           is nothing here": at the transparent end the squares show through, which is
+           what a cell painted at that opacity actually looks like. */
+        background:
+          var(--opacity-track),
+          repeating-conic-gradient(#d8d8d8 0% 25%, #ffffff 0% 50%) 0 0 / 10px 10px;
+      }
+
+      .opacity-slider::-moz-range-thumb {
+        width: 20px;
+        height: 20px;
+        border: 1px solid #6a6a6a;
+        border-radius: 50%;
+        background: #fff;
+      }
+    </style>
+    <script type="module" crossorigin src="/knottygrid/assets/index-CJWCo2nP.js"></script>
+  </head>
+  <body>
+    <div id="root"></div>
+  </body>
+</html>
